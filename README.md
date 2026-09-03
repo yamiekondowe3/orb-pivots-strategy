@@ -26,6 +26,24 @@ gate for the plain ORB baseline must pass on out-of-sample data with
 realistic costs before any pivot overlay is added** — see the design
 rationale in the project's research documents.
 
+## Real data now available
+
+MT5 connectivity is confirmed working (see `vwap-rsi-strategy`'s
+`reports/data_coverage.md` for the full story). Real M5 OHLCV for all 5
+assets is cached at `../data_cache/` — confirmed depth: XAUUSD/XAGUSD
+~15.7y, BTCUSD ~15.4y, ETHUSD ~11.1y, but **USOIL only ~2.6y** (broker
+symbol `US Oil`, not `USOIL`) — any USOIL result here inherits that same
+shallow-history caveat. `vwap-rsi-strategy/common/data_fetch.py`'s
+`BROKER_SYMBOL_MAP` has the confirmed broker symbol names; sync it here
+before building the ORB+Pivots data pipeline rather than re-deriving it.
+
+VWAP+RSI's own real-data XAUUSD result was strongly negative with default
+parameters (-71.8% return, Sharpe -4.07, ~100% Monte Carlo ruin
+probability) — a live example of the "go/no-go gate" this repo's plan
+refers to. Worth keeping in mind when the ORB+Pivots baseline is built:
+don't assume it'll fare differently just because the mechanism is
+different — the research docs flag both edges as weak/fragile.
+
 ## Layout
 
 - `common/` — vendored shared math/cost/metrics/Monte-Carlo/WFO modules
