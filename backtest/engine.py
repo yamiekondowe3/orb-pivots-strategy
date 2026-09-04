@@ -43,6 +43,9 @@ class ORBPivotParams:
     use_volume_filter: bool = False      # per research docs' Recommendation #5: trade only on abnormal opening volume
     volume_mult: float = 1.0             # today's OR-window volume must be >= this x the trailing average
     volume_lookback_days: int = 14
+    # Selectivity: skip flat/rangebound openings whose OR is too narrow to
+    # represent a real balance being established. 0.0 disables.
+    min_or_range_atr: float = 0.0        # require (or_high - or_low) >= this x ATR
 
 
 def prepare_signals(df: pd.DataFrame, p: ORBPivotParams) -> pd.DataFrame:
@@ -98,6 +101,10 @@ def prepare_signals(df: pd.DataFrame, p: ORBPivotParams) -> pd.DataFrame:
     if p.use_volume_filter:
         long_signal &= volume_ok.fillna(False)
         short_signal &= volume_ok.fillna(False)
+    if p.min_or_range_atr > 0:
+        or_wide_enough = (out["or_high"] - out["or_low"]) >= p.min_or_range_atr * out["atr"]
+        long_signal &= or_wide_enough.fillna(False)
+        short_signal &= or_wide_enough.fillna(False)
     if p.use_pivot_filter:
         long_signal &= out["close"] > out["P"]
         short_signal &= out["close"] < out["P"]
@@ -148,6 +155,9 @@ def run_backtest(df: pd.DataFrame, params: ORBPivotParams, symbol: str, starting
                     "side": position["side"], "entry_price": position["entry_price"],
                     "exit_price": exit_price, "size": position["size"],
                     "pnl": pnl, "return": pnl / position["equity_at_entry"],
+                    # Normalized edge: pnl per unit of capital actually risked.
+                    "risk_amount": position["risk_amount"],
+                    "r_multiple": pnl / position["risk_amount"] if position["risk_amount"] > 0 else np.nan,
                 })
                 position = None
             continue
@@ -187,6 +197,7 @@ def run_backtest(df: pd.DataFrame, params: ORBPivotParams, symbol: str, starting
         position = {
             "side": side, "entry_price": entry_price, "stop": stop, "target": target,
             "size": size, "entry_ts": ts_next, "equity_at_entry": equity,
+            "risk_amount": params.risk_pct * equity,
         }
         trades_today += 1
 

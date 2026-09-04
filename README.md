@@ -6,7 +6,27 @@ Monte Carlo, and walk-forward-optimization harness.
 
 ## Real-data result (headline finding): catastrophic FAIL
 
-## Real-data result: net-negative, after correcting a major cost-model bug
+## Final verdict: not profitable out-of-sample — see `reports/FINAL_VERDICT.md`
+
+After correcting the cost model, a disciplined walk-forward optimization
+over the selectivity space (volume threshold × opening-range width, 8
+combos × 13 rolling 2y-IS/1y-OOS windows, parameters chosen in-sample
+only) returned: **2/13 windows with positive out-of-sample edge, mean OOS
+expectancy -0.146 R per trade over 1,616 out-of-sample trades, mean
+R-normalized Sharpe -1.693.**
+
+Selectivity helped (the strict filters produced the only two positive
+years and 61–63% win rates) but not enough, and the in-sample →
+out-of-sample decay was systematic: three of the four windows with a
+positive in-sample edge went negative out-of-sample, the worst collapsing
+from +0.099R to -0.576R. That is noise-fitting, not structure.
+
+Every lever the source research recommended has now been tested on real
+data with correct costs: pivot bias filter, abnormal-volume filter,
+opening-range width filter, and the payoff ratio. **None yields a positive
+out-of-sample edge on XAUUSD M5.**
+
+## Prior stage: net-negative results after correcting a major cost-model bug
 
 **Important correction:** earlier versions of this README declared a
 "definitive" negative result. Those conclusions came from a broken

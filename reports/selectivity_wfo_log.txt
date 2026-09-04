@@ -1,0 +1,46 @@
+Data: 2011-01-02 22:00:00+00:00 .. 2026-09-04 08:05:00+00:00 (1094386 bars)
+13 walk-forward windows x 8 selectivity combos
+Fixed R:R = 2.0:1.5 (best found under corrected costs)
+
+[1/13] OOS 2013-01-02: chose vol>=2.0x, OR>=0.5xATR | IS E[R]=-0.0938 -> OOS E[R]=-0.1728 (42 trades, WR 50.0%)
+[2/13] OOS 2014-01-02: chose vol>=2.0x, OR>=0.0xATR | IS E[R]=-0.1230 -> OOS E[R]=-0.1671 (30 trades, WR 53.3%)
+[3/13] OOS 2015-01-02: chose vol>=1.5x, OR>=0.0xATR | IS E[R]=-0.0769 -> OOS E[R]=-0.2967 (121 trades, WR 45.5%)
+[4/13] OOS 2016-01-02: chose vol>=1.0x, OR>=0.5xATR | IS E[R]=-0.1788 -> OOS E[R]=-0.2308 (334 trades, WR 48.8%)
+[5/13] OOS 2017-01-02: chose vol>=1.0x, OR>=0.5xATR | IS E[R]=-0.2021 -> OOS E[R]=-0.2623 (309 trades, WR 48.9%)
+[6/13] OOS 2018-01-02: chose vol>=2.0x, OR>=0.0xATR | IS E[R]=-0.1141 -> OOS E[R]=-0.0062 (26 trades, WR 61.5%)
+[7/13] OOS 2019-01-02: chose vol>=2.0x, OR>=0.5xATR | IS E[R]=-0.0642 -> OOS E[R]=+0.0319 (54 trades, WR 61.1%)
+[8/13] OOS 2020-01-02: chose vol>=2.0x, OR>=0.5xATR | IS E[R]=+0.0451 -> OOS E[R]=+0.0806 (62 trades, WR 62.9%)
+[9/13] OOS 2021-01-02: chose vol>=2.0x, OR>=0.5xATR | IS E[R]=+0.0985 -> OOS E[R]=-0.5761 (12 trades, WR 25.0%)
+[10/13] OOS 2022-01-02: chose vol>=2.0x, OR>=0.0xATR | IS E[R]=+0.0404 -> OOS E[R]=-0.0708 (30 trades, WR 53.3%)
+[11/13] OOS 2023-01-02: chose vol>=1.5x, OR>=0.5xATR | IS E[R]=+0.0299 -> OOS E[R]=-0.0775 (116 trades, WR 54.3%)
+[12/13] OOS 2024-01-02: chose vol>=1.5x, OR>=0.5xATR | IS E[R]=-0.0218 -> OOS E[R]=-0.0909 (110 trades, WR 52.7%)
+[13/13] OOS 2025-01-02: chose vol>=1.0x, OR>=0.0xATR | IS E[R]=-0.0688 -> OOS E[R]=-0.0597 (370 trades, WR 54.3%)
+
+Total walk-forward time: 11305s
+
+======================================================================
+FINAL OUT-OF-SAMPLE VERDICT (normalized, per-trade edge in R units)
+======================================================================
+  oos_year  chosen_volume_mult  chosen_min_or_range_atr  is_expectancy_r  is_n_trades  oos_n_trades  oos_expectancy_r  oos_win_rate  oos_sharpe_r  oos_total_return_pct
+2013-01-02                 2.0                      0.5          -0.0938           48            42           -0.1728        0.5000        -1.462               -0.0307
+2014-01-02                 2.0                      0.0          -0.1230           60            30           -0.1671        0.5333        -1.071               -0.0282
+2015-01-02                 1.5                      0.0          -0.0769          232           121           -0.2967        0.4545        -3.794               -0.1607
+2016-01-02                 1.0                      0.5          -0.1788          763           334           -0.2308        0.4880        -4.890               -0.3185
+2017-01-02                 1.0                      0.5          -0.2021          703           309           -0.2623        0.4887        -5.261               -0.3377
+2018-01-02                 2.0                      0.0          -0.1141           70            26           -0.0062        0.6154        -0.037               -0.0040
+2019-01-02                 2.0                      0.5          -0.0642           68            54            0.0319        0.6111         0.311                0.0045
+2020-01-02                 2.0                      0.5           0.0451           86            62            0.0806        0.6290         0.762                0.0211
+2021-01-02                 2.0                      0.5           0.0985          118            12           -0.5761        0.2500        -2.659               -0.0291
+2022-01-02                 2.0                      0.0           0.0404           76            30           -0.0708        0.5333        -0.517               -0.0145
+2023-01-02                 1.5                      0.5           0.0299          190           116           -0.0775        0.5431        -0.975               -0.0486
+2024-01-02                 1.5                      0.5          -0.0218          218           110           -0.0909        0.5273        -1.091               -0.0531
+2025-01-02                 1.0                      0.0          -0.0688          716           370           -0.0597        0.5432        -1.323               -0.1110
+
+Windows with positive OOS edge : 2 / 13
+Mean OOS expectancy            : -0.1460 R per trade
+Total OOS trades               : 1616
+Mean OOS win rate              : 51.7%
+Mean OOS Sharpe (R-normalized) : -1.693
+
+VERDICT: NOT profitable out-of-sample
+Saved to C:\Users\HP\trading-systems\orb-pivots-strategy\reports\xauusd_selectivity_wfo_results.json
