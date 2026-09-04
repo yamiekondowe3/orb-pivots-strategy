@@ -4,17 +4,19 @@ Opening Range Breakout + Daily/Weekly Pivot Points strategy. Companion repo
 to `vwap-rsi-strategy`, sharing the same `common/` friction model, metrics,
 Monte Carlo, and walk-forward-optimization harness.
 
-## Status: scaffolding only
+## Real-data result (headline finding): catastrophic FAIL
 
-This repo is currently structural — directories and the vendored `common/`
-package are in place, but the ORB+Pivots strategy logic itself has not been
-implemented yet. Per the project's staged plan, `vwap-rsi-strategy` on
-XAUUSD is being built and validated as the proof-of-concept first; this
-repo's strategy code is Phase 4 (replicate the validated pattern here,
-staged as the research doc recommends: plain ATR-buffered ORB baseline →
-go/no-go gate → add the pivot bias filter only → re-test → optionally add
-pivot targets/stops → drop confluence/Camarilla overlays unless they
-independently survive walk-forward testing).
+Both the plain ATR-buffered ORB baseline and the ORB + pivot-bias-filter
+variant were run on the full 15.7-year real XAUUSD history (1,094,283 M5
+bars from the connected MT5 demo account). **Both wipe out the account**
+(-99.9999% return, Sharpe ~-5.3 to -5.4, 100% Monte Carlo ruin
+probability) — worse than `vwap-rsi-strategy`'s already-negative XAUUSD
+result. Root cause: win rate (~26%) sits well below the ~33% breakeven
+implied by the 1:2 stop:target ratio used, and the pivot bias filter made
+almost no difference (confirming the research docs' warning that fusing
+two weak edges doesn't rescue either one). See `reports/data_coverage.md`
+for the full writeup and `reports/xauusd_orb_pivots_real_data_results.json`
+for the raw numbers. Reported as-is, not smoothed over.
 
 ## Honesty notice
 
