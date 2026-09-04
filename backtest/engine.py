@@ -134,7 +134,12 @@ def run_backtest(df: pd.DataFrame, params: ORBPivotParams, symbol: str, starting
             hit_target = (position["side"] == 1 and next_row["high"] >= position["target"]) or \
                          (position["side"] == -1 and next_row["low"] <= position["target"])
             if hit_stop or hit_target:
-                exit_price = position["stop"] if hit_stop else position["target"]
+                # Conservative: assume stop fills first if both touched in one bar.
+                level = position["stop"] if hit_stop else position["target"]
+                # Exit crosses the spread against us too (this was missing before).
+                exit_price = level - position["side"] * friction.half_spread(
+                    ts_next, level, next_row.get("spread")
+                )
                 pnl = position["side"] * (exit_price - position["entry_price"]) * position["size"]
                 pnl -= friction.commission(abs(position["size"] * exit_price))
                 equity += pnl
@@ -156,7 +161,8 @@ def run_backtest(df: pd.DataFrame, params: ORBPivotParams, symbol: str, starting
         if side == 0:
             continue
 
-        entry_price = friction.apply_fill(ts_next, next_row["open"], row["atr"], side)
+        entry_price = friction.apply_fill(ts_next, next_row["open"], row["atr"], side,
+                                          bar_spread=next_row.get("spread"))
 
         if params.use_pivot_stop_target and np.isfinite(row.get("S1", np.nan)) and np.isfinite(row.get("R1", np.nan)):
             if side == 1:

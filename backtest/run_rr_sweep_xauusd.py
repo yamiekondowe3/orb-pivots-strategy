@@ -21,11 +21,15 @@ from backtest.engine import run_backtest, ORBPivotParams
 
 SHARED_DATA_ROOT = Path(__file__).resolve().parents[2] / "data_cache"
 
-# (stop_atr_mult, target_atr_mult, label) -- all RR < 1 (target smaller than stop)
+# (stop_atr_mult, target_atr_mult, label). Includes the original 1:2 for a
+# like-for-like comparison under the CORRECTED cost model (the previous run
+# of this sweep used a cost model that charged ~68% of the risk budget per
+# trade in fabricated commission/spread -- see common/costs.py).
 VARIANTS = [
     (2.0, 1.5, "2:1.5"),
     (1.5, 1.0, "1.5:1"),
     (2.0, 1.0, "2:1"),
+    (1.0, 2.0, "1:2 (original, for comparison)"),
 ]
 
 

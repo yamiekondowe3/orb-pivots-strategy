@@ -6,21 +6,31 @@ Monte Carlo, and walk-forward-optimization harness.
 
 ## Real-data result (headline finding): catastrophic FAIL
 
-Seven variants tested on the full 15.7-year real XAUUSD history
-(1,094,283 M5 bars, connected MT5 demo account): plain baseline, +pivot
-bias filter, +abnormal-volume filter (the research docs' highest-value
-documented ORB enhancement), +both, and three tighter-target R:R
-reshapes (2:1.5, 1.5:1, 2:1). **All seven wipe out the account** (100%
-Monte Carlo ruin probability every time). The R:R sweep is the
-decisive result: win rate moved exactly as predicted with each R:R change
-(26% up to 58%), but **expectancy per trade landed at the identical
--1.248 in all four R:R settings tested** — meaning the raw breakout
-signal has zero information content; price statistically self-adjusts the
-win rate to track the R:R chosen, landing at/below breakeven regardless.
-See `reports/rr_sweep_finding.md` for the full analysis and
-`reports/data_coverage.md` for the filter-variant writeup. This closes out
-ORB+Pivots/XAUUSD as a definitive negative result, not an inconclusive
-one — reported as-is, not smoothed over.
+## Real-data result: net-negative, after correcting a major cost-model bug
+
+**Important correction:** earlier versions of this README declared a
+"definitive" negative result. Those conclusions came from a broken
+`common/costs.py` that invented commission/spread constants instead of
+using the broker's real terms — on XAUUSD it charged **68% of the per-trade
+risk budget in fabricated costs**, which would bury any strategy. That is
+fixed (real per-bar MT5 spread; commission defaults to zero for Deriv's
+spread-only CFDs; exit-side spread now charged too), and all results were
+re-run. See `reports/rr_sweep_finding.md` for the full correction.
+
+Under the corrected model, on the full 15.67-year real XAUUSD M5 history,
+the best configuration found is a **2:1.5 stop:target (2.0xATR stop,
+1.5xATR target): Sharpe -2.07, win rate 54.0% against a 57.1% breakeven**
+— a 3.1-point shortfall. The cost fix roughly halved the damage across
+every variant, but **none is profitable**: all finish 3–7 points short of
+their own breakeven and still draw down heavily over 15 years.
+
+Honest status: **the ORB signal on XAUUSD M5 is much closer to viable than
+the broken model implied, but remains net-negative.** The main untested
+lever is selectivity — every variant so far takes ~2 trades/day on
+essentially every trading day (no filtering at all), whereas the research
+docs' strongest documented ORB result depended on extreme
+abnormal-volume selectivity. See `reports/rr_sweep_finding.md` for that
+analysis and the walk-forward discipline any such test should follow.
 
 ## Honesty notice
 
