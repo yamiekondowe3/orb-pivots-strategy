@@ -40,6 +40,9 @@ class ORBPivotParams:
     risk_pct: float = 0.005
     use_pivot_filter: bool = False       # bias filter: only trade with pivot-implied direction
     use_pivot_stop_target: bool = False  # stop = tighter-of(OR side, opposing pivot) floored by ATR; target = next pivot
+    use_volume_filter: bool = False      # per research docs' Recommendation #5: trade only on abnormal opening volume
+    volume_mult: float = 1.0             # today's OR-window volume must be >= this x the trailing average
+    volume_lookback_days: int = 14
 
 
 def prepare_signals(df: pd.DataFrame, p: ORBPivotParams) -> pd.DataFrame:
@@ -80,8 +83,21 @@ def prepare_signals(df: pd.DataFrame, p: ORBPivotParams) -> pd.DataFrame:
     active_hours = (out.index.hour >= p.anchor_hour_utc) & (out.index.hour < p.cutoff_hour_utc)
     out["active"] = active_hours & out["or_window_closed"]
 
+    # Abnormal opening-volume filter (research docs' Recommendation #5, the
+    # single strongest documented ORB enhancement): today's OR-window volume
+    # vs. the trailing average of PRIOR days' OR-window volume only (shift(1)
+    # -- today never contributes to its own baseline, no look-ahead).
+    daily_or_vol = out["volume"].where(in_or_window, 0.0).groupby(day_key).sum()
+    trailing_avg_vol = daily_or_vol.rolling(p.volume_lookback_days, min_periods=3).mean().shift(1)
+    out["or_volume_today"] = day_key.map(daily_or_vol)
+    out["or_volume_trailing_avg"] = day_key.map(trailing_avg_vol)
+    volume_ok = out["or_volume_today"] >= p.volume_mult * out["or_volume_trailing_avg"]
+
     long_signal = out["active"] & (out["close"] > long_trigger)
     short_signal = out["active"] & (out["close"] < short_trigger)
+    if p.use_volume_filter:
+        long_signal &= volume_ok.fillna(False)
+        short_signal &= volume_ok.fillna(False)
     if p.use_pivot_filter:
         long_signal &= out["close"] > out["P"]
         short_signal &= out["close"] < out["P"]

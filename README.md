@@ -6,17 +6,19 @@ Monte Carlo, and walk-forward-optimization harness.
 
 ## Real-data result (headline finding): catastrophic FAIL
 
-Both the plain ATR-buffered ORB baseline and the ORB + pivot-bias-filter
-variant were run on the full 15.7-year real XAUUSD history (1,094,283 M5
-bars from the connected MT5 demo account). **Both wipe out the account**
-(-99.9999% return, Sharpe ~-5.3 to -5.4, 100% Monte Carlo ruin
-probability) — worse than `vwap-rsi-strategy`'s already-negative XAUUSD
-result. Root cause: win rate (~26%) sits well below the ~33% breakeven
-implied by the 1:2 stop:target ratio used, and the pivot bias filter made
-almost no difference (confirming the research docs' warning that fusing
-two weak edges doesn't rescue either one). See `reports/data_coverage.md`
-for the full writeup and `reports/xauusd_orb_pivots_real_data_results.json`
-for the raw numbers. Reported as-is, not smoothed over.
+Four variants were run on the full 15.7-year real XAUUSD history
+(1,094,283 M5 bars from the connected MT5 demo account): plain baseline,
++pivot bias filter, +abnormal-volume filter (the research docs'
+highest-value documented ORB enhancement), and +both. **All four wipe out
+the account** (-99.999% to -99.9999% return, Sharpe -5.0 to -5.4, 100%
+Monte Carlo ruin probability every time) — worse than
+`vwap-rsi-strategy`'s already-negative XAUUSD result. All four converge on
+the same ~26-27% win rate, well below the ~33% breakeven the 1:2
+stop:target ratio requires — a well-established structural finding (the
+payoff shape, not signal quality, is the problem) since no combination of
+entry filters moves it. See `reports/data_coverage.md` for the full
+writeup and analysis, and the two `reports/*.json` files for raw numbers.
+Reported as-is, not smoothed over.
 
 ## Honesty notice
 

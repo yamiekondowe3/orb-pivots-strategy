@@ -75,6 +75,19 @@ def test_backtest_runs_and_respects_max_trades_per_day():
     assert (trades["exit_ts"] >= trades["entry_ts"]).all()
 
 
+def test_volume_filter_reduces_or_preserves_signal_count():
+    """Volume filter is a strict AND condition -- can't produce MORE signals
+    than the plain baseline, and must never use TODAY's own OR volume as
+    part of its own baseline (checked structurally via the shift(1) in
+    prepare_signals, exercised here via a signal-count sanity check)."""
+    df = make_synthetic_ohlcv(n=8000, freq="5min")
+    baseline = prepare_signals(df, ORBPivotParams(use_volume_filter=False))
+    filtered = prepare_signals(df, ORBPivotParams(use_volume_filter=True, volume_mult=1.0, volume_lookback_days=5))
+    base_signals = (baseline["long_signal"] | baseline["short_signal"]).sum()
+    filt_signals = (filtered["long_signal"] | filtered["short_signal"]).sum()
+    assert filt_signals <= base_signals
+
+
 def test_standard_pivots_formula():
     piv = standard_pivots(prior_high=110, prior_low=90, prior_close=100)
     assert piv["P"] == pytest.approx(100.0)

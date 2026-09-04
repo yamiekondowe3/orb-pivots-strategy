@@ -39,25 +39,51 @@ own (the documented strongest ORB enhancement, an abnormal-opening-volume
 filter, was NOT implemented here and remains the most promising untested
 lever per the docs' Recommendation #5).
 
-Per the plan's explicit go/no-go instruction ("if the plain ORB has no
-positive out-of-sample expectancy after costs, do not proceed — pivots
-will not rescue it"), and given the pivot filter check already ran and
-made no material difference, **stopping here rather than running a full
-walk-forward grid search** (which took ~44 minutes for VWAP+RSI and would
-be a similar investment for a result this decisively negative). A WFO
-pass is still a legitimate follow-up if the parameter space is
-re-designed (tighter targets given the low win rate, and/or the
-abnormal-volume filter), but re-tuning stop/target multiples on the
-*current* rule shape is unlikely to close a 26%-vs-33%+ win-rate gap this
-wide.
+## Follow-up: abnormal opening-volume filter (research docs' Recommendation #5)
 
-Full result JSON: `reports/xauusd_orb_pivots_real_data_results.json`.
+Implemented (`use_volume_filter` in `ORBPivotParams`; today's OR-window
+volume must be >= `volume_mult` x the trailing `volume_lookback_days`-day
+average of PRIOR days' OR volume, `shift(1)`'d so today never contributes
+to its own baseline) and tested on the same full real XAUUSD history,
+`volume_mult=1.0`, `volume_lookback_days=14`:
+
+| | + Volume filter | + Volume filter + pivot filter |
+|---|---|---|
+| Trades | 5,517 | 5,335 |
+| Total return | -99.9994% | -99.9989% |
+| Sharpe | -5.14 | -5.04 |
+| Win rate | 26.7% | 26.7% |
+| Monte Carlo ruin probability | 100% | 100% |
+
+**All four variants tested (plain, +pivot filter, +volume filter,
++both) converge on the same ~26-27% win rate**, regardless of which
+signal-quality filter is applied. This is now a well-established
+structural finding, not noise from one run: **the problem is the
+stop:target ratio (1.0:2.0 ATR, needing ~33% win rate to break even), not
+signal quality.** No combination of entry filters can fix a payoff
+structure whose realized win rate sits consistently ~6-7 points below its
+own breakeven threshold — filters change WHICH breakouts get traded, not
+the ATR-multiple payoff shape that determines the breakeven bar itself.
+
+**Stopping the filter-search here per the plan's overfitting warning.**
+The one lever that could plausibly help is re-designing the payoff shape
+itself (e.g. a larger `target_atr_mult`, which lowers the required
+breakeven win rate below the ~26% actually observed) — but that is a
+parameter-tuning search over the exact thing this project's go/no-go gate
+exists to guard against chasing without an out-of-sample check. If pursued,
+it should go through the same real walk-forward grid-search discipline
+used for `vwap-rsi-strategy` (`backtest/run_wfo_xauusd.py` there is the
+template), not a hand-picked multiplier evaluated once on the full
+history.
+
+Full result JSONs: `reports/xauusd_orb_pivots_real_data_results.json`,
+`reports/xauusd_orb_volume_filter_results.json`.
 
 ## Not done yet
 
-- Abnormal opening-volume filter (the research docs' single
-  highest-value documented ORB enhancement — not yet implemented).
-- Walk-forward optimization / Monte Carlo VaR on a re-designed parameter
-  space.
+- Walk-forward optimization over the stop:target ATR-multiple space (the
+  one remaining plausible lever, per the analysis above) — not run this
+  session; would need the same WFO discipline as `vwap-rsi-strategy`.
 - Replication to XAGUSD / USOIL / BTCUSD / ETHUSD.
-- MQL5 EA Strategy Tester validation.
+- MQL5 EA Strategy Tester validation (the EA now mirrors the volume filter
+  too, but is untested in the Strategy Tester).

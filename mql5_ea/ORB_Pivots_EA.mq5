@@ -23,15 +23,25 @@ input int    Cutoff_Hour_UTC    = 18;    // no new entries after this UTC hour
 input double Risk_Pct           = 0.5;   // percent of equity risked per trade
 input bool   UsePivotFilter     = false; // bias filter: only trade with pivot-implied direction
 input bool   UsePivotStopTarget = false; // stop = tighter-of(OR side, opposing pivot); target = next pivot
+input bool   UseVolumeFilter    = false; // trade only on abnormal opening volume (docs' top ORB enhancement)
+input double VolumeMult         = 1.0;   // today's OR-window volume must be >= this x trailing average
+input int    VolumeLookbackDays = 14;
 input int    Slippage_Points    = 30;
 input int    MagicNumber        = 20260904;
 
 int atrHandle;
 double orHigh = 0, orLow = 0;
+long   orVolumeToday = 0;
 datetime orDay = 0;
 bool orWindowClosed = false;
 int tradesToday = 0;
 datetime tradesTodayDate = 0;
+
+// Trailing OR-window volume history, keyed by day -- used to compute the
+// abnormal-volume filter without look-ahead (today never contributes to
+// its own trailing baseline).
+long   orVolumeHistory[];
+datetime orVolumeHistoryDay[];
 
 double pivotP, pivotR1, pivotR2, pivotS1, pivotS2;
 datetime pivotDay = 0;
@@ -78,8 +88,13 @@ void UpdateOpeningRange()
    datetime today = TimeCurrent() - (dt.hour * 3600 + dt.min * 60 + dt.sec);
    if(today != orDay)
    {
+      // Day just rolled: archive YESTERDAY's completed OR volume into the
+      // trailing history BEFORE resetting -- today's own volume must never
+      // be part of its own baseline (matches the shift(1) in
+      // backtest/engine.py::prepare_signals).
+      if(orDay != 0 && orWindowClosed) PushOrVolumeHistory(orDay, orVolumeToday);
       orDay = today;
-      orHigh = 0; orLow = 0; orWindowClosed = false;
+      orHigh = 0; orLow = 0; orVolumeToday = 0; orWindowClosed = false;
    }
 
    if(dt.hour != Anchor_Hour_UTC) return; // only accumulate during the anchor hour's first N bars
@@ -96,6 +111,28 @@ void UpdateOpeningRange()
    double l = iLow(_Symbol, PERIOD_CURRENT, 1);
    if(orHigh == 0 || h > orHigh) orHigh = h;
    if(orLow == 0 || l < orLow) orLow = l;
+   orVolumeToday += iVolume(_Symbol, PERIOD_CURRENT, 1);
+}
+
+void PushOrVolumeHistory(datetime day, long vol)
+{
+   int n = ArraySize(orVolumeHistory);
+   ArrayResize(orVolumeHistory, n + 1);
+   ArrayResize(orVolumeHistoryDay, n + 1);
+   orVolumeHistory[n] = vol;
+   orVolumeHistoryDay[n] = day;
+}
+
+//--- Trailing average of the last VolumeLookbackDays PRIOR days' OR volume
+//--- (today's own value is never in orVolumeHistory yet at call time).
+double GetTrailingAvgVolume()
+{
+   int n = ArraySize(orVolumeHistory);
+   if(n == 0) return 0;
+   int count = MathMin(n, VolumeLookbackDays);
+   long total = 0;
+   for(int i = n - count; i < n; i++) total += orVolumeHistory[i];
+   return (double)total / count;
 }
 
 bool HasOpenPosition()
@@ -159,6 +196,13 @@ void OnTick()
    {
       longSignal = longSignal && (closeNow > pivotP);
       shortSignal = shortSignal && (closeNow < pivotP);
+   }
+   if(UseVolumeFilter)
+   {
+      double trailingAvg = GetTrailingAvgVolume();
+      bool volumeOk = trailingAvg > 0 && orVolumeToday >= VolumeMult * trailingAvg;
+      longSignal = longSignal && volumeOk;
+      shortSignal = shortSignal && volumeOk;
    }
    if(!longSignal && !shortSignal) return;
 

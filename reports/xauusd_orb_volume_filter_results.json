@@ -1,0 +1,68 @@
+{
+  "coverage": {
+    "symbol": "XAUUSD-M5",
+    "achieved_start": "2011-01-02 22:00:00+00:00",
+    "achieved_end": "2026-09-03 23:30:00+00:00",
+    "n_bars": 1094283,
+    "years_covered": 15.67,
+    "venue": "mt5:Deriv-Demo"
+  },
+  "volume_only": {
+    "report": {
+      "n_trades": 5517,
+      "sharpe": -5.139585751172452,
+      "sortino": -81.26004018273323,
+      "max_drawdown_pct": -0.9999945225036736,
+      "max_drawdown_duration": "5500",
+      "profit_factor": 0.6009334569465393,
+      "calmar": -0.42274475539239786,
+      "expectancy": -1.812568552576884,
+      "win_rate": 0.26663041508065977,
+      "recovery_factor": -10061.85245035501,
+      "total_return_pct": -0.9999940337782915
+    },
+    "monte_carlo": {
+      "method": "bootstrap",
+      "n_iterations": 5000,
+      "n_trades_per_sim": 5517,
+      "var_95": -0.9999973419601845,
+      "var_99": -0.9999981018835882,
+      "median_final_equity": 5.955089669474078e-06,
+      "mean_final_equity": 6.7131507645604885e-06,
+      "worst_max_drawdown": -0.9999988494018883,
+      "median_max_drawdown": -0.9999941228031883,
+      "p95_max_drawdown": -0.999997365568283,
+      "ruin_probability": 1.0,
+      "ruin_threshold": 0.5
+    }
+  },
+  "volume_and_pivot": {
+    "report": {
+      "n_trades": 5335,
+      "sharpe": -5.0363803211144536,
+      "sortino": -79.34417379945859,
+      "max_drawdown_pct": -0.9999894625970025,
+      "max_drawdown_duration": "5304",
+      "profit_factor": 0.6188478678982471,
+      "calmar": -0.41677427141841755,
+      "expectancy": -1.8743933807885305,
+      "win_rate": 0.2667291471415183,
+      "recovery_factor": -9911.397263437382,
+      "total_return_pct": -0.9999889672709288
+    },
+    "monte_carlo": {
+      "method": "bootstrap",
+      "n_iterations": 5000,
+      "n_trades_per_sim": 5335,
+      "var_95": -0.9999950609848309,
+      "var_99": -0.9999963702076214,
+      "median_final_equity": 1.0927164267617552e-05,
+      "mean_final_equity": 1.2277837773125005e-05,
+      "worst_max_drawdown": -0.999998841148624,
+      "median_max_drawdown": -0.9999892342898895,
+      "p95_max_drawdown": -0.9999951406197348,
+      "ruin_probability": 1.0,
+      "ruin_threshold": 0.5
+    }
+  }
+}
