@@ -1,0 +1,102 @@
+{
+  "coverage": {
+    "symbol": "XAUUSD-M5",
+    "achieved_start": "2011-01-02 22:00:00+00:00",
+    "achieved_end": "2026-09-03 23:30:00+00:00",
+    "n_bars": 1094283,
+    "years_covered": 15.67,
+    "venue": "mt5:Deriv-Demo"
+  },
+  "variants": {
+    "2:1.5": {
+      "breakeven_win_rate": 0.5714285714285714,
+      "report": {
+        "n_trades": 8014,
+        "sharpe": -4.3659869411045165,
+        "sortino": -84.14540737941685,
+        "max_drawdown_pct": -0.999943945983252,
+        "max_drawdown_duration": "7979",
+        "profit_factor": 0.5825517837336522,
+        "calmar": -0.26400464849246885,
+        "expectancy": -1.247743836954775,
+        "win_rate": 0.5036186673321688,
+        "recovery_factor": -10060.009525838132,
+        "total_return_pct": -0.9999415622269044
+      },
+      "monte_carlo": {
+        "method": "bootstrap",
+        "n_iterations": 5000,
+        "n_trades_per_sim": 8014,
+        "var_95": -0.9999690836238871,
+        "var_99": -0.999976312667191,
+        "median_final_equity": 5.795646623458868e-05,
+        "mean_final_equity": 6.25355432985009e-05,
+        "worst_max_drawdown": -0.9999836441950811,
+        "median_max_drawdown": -0.9999426336317505,
+        "p95_max_drawdown": -0.9999692950471303,
+        "ruin_probability": 1.0,
+        "ruin_threshold": 0.5
+      }
+    },
+    "1.5:1": {
+      "breakeven_win_rate": 0.6,
+      "report": {
+        "n_trades": 8015,
+        "sharpe": -6.561566555176677,
+        "sortino": -91.09675777460653,
+        "max_drawdown_pct": -0.9999991403061664,
+        "max_drawdown_duration": "7994",
+        "profit_factor": 0.4364503431418099,
+        "calmar": -0.3550561657720801,
+        "expectancy": -1.247659552127842,
+        "win_rate": 0.49008109794135996,
+        "recovery_factor": -10063.29113244058,
+        "total_return_pct": -0.9999991255306492
+      },
+      "monte_carlo": {
+        "method": "bootstrap",
+        "n_iterations": 5000,
+        "n_trades_per_sim": 8015,
+        "var_95": -0.9999995276966716,
+        "var_99": -0.999999632979045,
+        "median_final_equity": 8.662106740027021e-07,
+        "mean_final_equity": 9.318731777927435e-07,
+        "worst_max_drawdown": -0.9999997994487749,
+        "median_max_drawdown": -0.999999137131804,
+        "p95_max_drawdown": -0.9999995302391179,
+        "ruin_probability": 1.0,
+        "ruin_threshold": 0.5
+      }
+    },
+    "2:1": {
+      "breakeven_win_rate": 0.6666666666666666,
+      "report": {
+        "n_trades": 8015,
+        "sharpe": -5.383842810332617,
+        "sortino": -88.58454330624112,
+        "max_drawdown_pct": -0.9999622793541518,
+        "max_drawdown_duration": "8001",
+        "profit_factor": 0.4808539230667434,
+        "calmar": -0.2733794919755988,
+        "expectancy": -1.2476124963147999,
+        "win_rate": 0.5802869619463505,
+        "recovery_factor": -10060.021451321845,
+        "total_return_pct": -0.9999611841748011
+      },
+      "monte_carlo": {
+        "method": "bootstrap",
+        "n_iterations": 5000,
+        "n_trades_per_sim": 8015,
+        "var_95": -0.9999774418887243,
+        "var_99": -0.9999817750450262,
+        "median_final_equity": 3.851898503681187e-05,
+        "mean_final_equity": 4.069718725542544e-05,
+        "worst_max_drawdown": -0.9999879081051736,
+        "median_max_drawdown": -0.9999616970497307,
+        "p95_max_drawdown": -0.999977583228656,
+        "ruin_probability": 1.0,
+        "ruin_threshold": 0.5
+      }
+    }
+  }
+}

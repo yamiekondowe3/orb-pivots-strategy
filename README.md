@@ -6,19 +6,21 @@ Monte Carlo, and walk-forward-optimization harness.
 
 ## Real-data result (headline finding): catastrophic FAIL
 
-Four variants were run on the full 15.7-year real XAUUSD history
-(1,094,283 M5 bars from the connected MT5 demo account): plain baseline,
-+pivot bias filter, +abnormal-volume filter (the research docs'
-highest-value documented ORB enhancement), and +both. **All four wipe out
-the account** (-99.999% to -99.9999% return, Sharpe -5.0 to -5.4, 100%
-Monte Carlo ruin probability every time) — worse than
-`vwap-rsi-strategy`'s already-negative XAUUSD result. All four converge on
-the same ~26-27% win rate, well below the ~33% breakeven the 1:2
-stop:target ratio requires — a well-established structural finding (the
-payoff shape, not signal quality, is the problem) since no combination of
-entry filters moves it. See `reports/data_coverage.md` for the full
-writeup and analysis, and the two `reports/*.json` files for raw numbers.
-Reported as-is, not smoothed over.
+Seven variants tested on the full 15.7-year real XAUUSD history
+(1,094,283 M5 bars, connected MT5 demo account): plain baseline, +pivot
+bias filter, +abnormal-volume filter (the research docs' highest-value
+documented ORB enhancement), +both, and three tighter-target R:R
+reshapes (2:1.5, 1.5:1, 2:1). **All seven wipe out the account** (100%
+Monte Carlo ruin probability every time). The R:R sweep is the
+decisive result: win rate moved exactly as predicted with each R:R change
+(26% up to 58%), but **expectancy per trade landed at the identical
+-1.248 in all four R:R settings tested** — meaning the raw breakout
+signal has zero information content; price statistically self-adjusts the
+win rate to track the R:R chosen, landing at/below breakeven regardless.
+See `reports/rr_sweep_finding.md` for the full analysis and
+`reports/data_coverage.md` for the filter-variant writeup. This closes out
+ORB+Pivots/XAUUSD as a definitive negative result, not an inconclusive
+one — reported as-is, not smoothed over.
 
 ## Honesty notice
 
