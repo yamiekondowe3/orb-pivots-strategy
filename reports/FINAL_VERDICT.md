@@ -86,6 +86,26 @@ annualized by the true trade rate.
    roughly -0.073% of equity per trade, ~500 trades/year — a decisive,
    not borderline, negative expectancy.
 
+## Cross-strategy diagnostic: in-sample selection predicts nothing
+
+Testing whether choosing parameters in-sample carries **any** information
+about out-of-sample performance, across both strategies' walk-forwards:
+
+| Strategy | IS→OOS correlation | Mean OOS when IS>0 | Mean OOS when IS≤0 |
+|---|---|---|---|
+| ORB+Pivots | r = **-0.033** (p=0.91) | -0.1609 R (n=4) | -0.1394 R (n=9) |
+| VWAP+RSI | r = **+0.109** (p=0.72) | -0.1214 R (n=7) | -0.1214 R (n=6) |
+
+The correlation is statistically indistinguishable from zero in both. For
+VWAP+RSI the conditional means are identical to four decimals — windows
+where the optimizer found a positive in-sample edge did exactly as badly
+out-of-sample as windows where it found a negative one.
+
+This is stronger evidence than any single negative backtest, and it is
+what rules out the obvious next move: a **larger** parameter search would
+produce better in-sample numbers and the same out-of-sample expectation,
+because the in-sample differences being selected on are noise.
+
 ## Conclusion
 
 **Every lever the source research documents recommended has now been
