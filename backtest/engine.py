@@ -1,10 +1,16 @@
-"""Bar-by-bar backtest engine for the VWAP+RSI strategy.
+"""Bar-by-bar backtest engine for Opening Range Breakout + Pivot Points.
 
-Deliberately a straightforward loop (not a vectorized/JIT engine) so the
-no-look-ahead and friction-model wiring stays easy to audit -- correctness
-over raw speed for this proof-of-concept. Every entry uses only CLOSED-bar
-data and fills at the NEXT bar's open, consistent with the research docs'
-look-ahead-trap warnings.
+Staged per the research docs' recommendation: `use_pivot_filter` and
+`use_pivot_stop_target` are OFF by default, giving the plain ATR-buffered
+ORB baseline. Turn them on only after the baseline clears its own go/no-go
+gate -- stacking the pivot overlay onto a dead baseline just adds
+overfitting risk for no reason.
+
+Look-ahead discipline: the opening range is frozen exactly at window end;
+pivots use only the fully-closed prior FX/trading day (see
+common.indicators.daily_prior_hlc); breakout confirmation requires a
+CLOSED bar's close beyond the trigger; fills execute at the next bar's
+open.
 """
 from __future__ import annotations
 
@@ -17,105 +23,98 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from common.costs import FrictionModel
-from common.indicators import anchored_vwap, rsi, atr
+from common.indicators import atr, standard_pivots, daily_prior_hlc
 
 
 @dataclass
-class VWAPRSIParams:
-    rsi_period: int = 14
-    rsi_overbought: float = 70.0
-    rsi_oversold: float = 30.0
-    vwap_slope_window: int = 15
+class ORBPivotParams:
+    or_window_bars: int = 3          # 15 min of M5 bars
+    anchor_hour_utc: int = 8         # ~London open
+    k_buffer_atr: float = 0.10       # breakout confirmation buffer, x ATR
     atr_period: int = 14
-    stop_atr_mult: float = 2.0
-    target_atr_mult: float = 2.0   # 1.0R by default; tune per go/no-go gate
-    risk_pct: float = 0.005        # 0.5% equity risk per trade
-    day_boundary_hour_utc: int = 0  # daily VWAP reset anchor
-    # Selectivity: require price to have actually stretched away from VWAP
-    # before taking the pullback, rather than firing on any RSI cross near
-    # the mean. This is the mechanical stand-in for the research docs'
-    # VWAP deviation-band concept (trade the 1-1.5 sigma stretch, not noise
-    # around the average). 0.0 disables.
-    min_vwap_dist_atr: float = 0.0
-    # Self-calibrating RSI thresholds. A hardcoded 30/70 is implicitly
-    # calibrated to ONE timeframe's noise level: RSI dispersion shrinks on
-    # coarser bars, so the same 30 that fires often on M5 becomes a rare
-    # extreme on M15 (21 trades in 15 years -- statistically useless). Using
-    # a rolling PERCENTILE of RSI's own recent distribution keeps the
-    # threshold at a constant rarity across timeframes AND instruments,
-    # with no per-market tuning. That is a structural fix, not a fitted
-    # parameter: one rule, self-adjusting everywhere.
-    adaptive_rsi: bool = False
-    rsi_pctile: float = 20.0        # enter when RSI is in its lowest/highest N% (longs/shorts)
-    rsi_pctile_window: int = 500
-    # Entry trigger. The source research document specifies a "first
-    # counter-color pullback candle toward VWAP" -- NOT an RSI cross. This
-    # project substituted RSI from the start, so the documented strategy was
-    # never actually tested. "pullback" is the faithful implementation;
-    # "none" is the pure VWAP side+slope filter with no trigger at all.
-    trigger: str = "rsi"            # rsi | pullback | none    # trailing bars defining "recent distribution"
+    stop_atr_mult: float = 1.0       # floor on stop distance, x ATR
+    target_atr_mult: float = 2.0     # plain-baseline fixed-R target (used when use_pivot_stop_target=False)
+    day_boundary_hour_utc: int = 22  # ~17:00 ET FX day rollover, for pivot prior-day boundary
+    max_trades_per_day: int = 2
+    cutoff_hour_utc: int = 18        # no new entries after this UTC hour
+    risk_pct: float = 0.005
+    use_pivot_filter: bool = False       # bias filter: only trade with pivot-implied direction
+    use_pivot_stop_target: bool = False  # stop = tighter-of(OR side, opposing pivot) floored by ATR; target = next pivot
+    use_volume_filter: bool = False      # per research docs' Recommendation #5: trade only on abnormal opening volume
+    volume_mult: float = 1.0             # today's OR-window volume must be >= this x the trailing average
+    volume_lookback_days: int = 14
+    # Selectivity: skip flat/rangebound openings whose OR is too narrow to
+    # represent a real balance being established. 0.0 disables.
+    min_or_range_atr: float = 0.0        # require (or_high - or_low) >= this x ATR
 
 
-def prepare_signals(df: pd.DataFrame, p: VWAPRSIParams) -> pd.DataFrame:
+def prepare_signals(df: pd.DataFrame, p: ORBPivotParams) -> pd.DataFrame:
     out = df.copy()
-    anchor_mask = out.index.to_series().dt.floor("D").diff().fillna(pd.Timedelta(0)) != pd.Timedelta(0)
-    anchor_mask.iloc[0] = True
-    out["vwap"] = anchored_vwap(out, anchor_mask)
-    out["vwap_slope_up"] = out["vwap"] > out["vwap"].shift(p.vwap_slope_window)
-    out["vwap_slope_down"] = out["vwap"] < out["vwap"].shift(p.vwap_slope_window)
-    out["rsi"] = rsi(out["close"], p.rsi_period)
     out["atr"] = atr(out, p.atr_period)
 
-    # Entry thresholds: either fixed levels, or RSI's own trailing
-    # percentiles so the threshold means the same thing on any timeframe.
-    # The percentile window is shifted by 1 bar so the current bar's RSI
-    # never contributes to the threshold it is being tested against.
-    if p.adaptive_rsi:
-        roll = out["rsi"].rolling(p.rsi_pctile_window, min_periods=p.rsi_pctile_window // 2)
-        oversold_level = roll.quantile(p.rsi_pctile / 100.0).shift(1)
-        overbought_level = roll.quantile(1.0 - p.rsi_pctile / 100.0).shift(1)
-    else:
-        oversold_level = pd.Series(p.rsi_oversold, index=out.index)
-        overbought_level = pd.Series(p.rsi_overbought, index=out.index)
-    out["rsi_oversold_level"] = oversold_level
-    out["rsi_overbought_level"] = overbought_level
+    prior = daily_prior_hlc(out, day_boundary_hour_utc=p.day_boundary_hour_utc)
+    pivots = prior.apply(
+        lambda row: standard_pivots(row["prior_high"], row["prior_low"], row["prior_close"])
+        if row.notna().all() else pd.Series({k: np.nan for k in ["P", "R1", "R2", "R3", "S1", "S2", "S3"]}),
+        axis=1, result_type="expand",
+    )
+    out = out.join(pivots)
 
-    # Entry filters, evaluated on the CLOSED bar (signal), executed next bar.
-    # Shared directional filter: price on the correct side of VWAP, VWAP
-    # sloping that way. Identical across all three triggers.
-    long_ok = (out["close"] > out["vwap"]) & out["vwap_slope_up"]
-    short_ok = (out["close"] < out["vwap"]) & out["vwap_slope_down"]
+    # Opening range: identify each day's anchor window and freeze OR_high/OR_low at window end.
+    is_anchor_hour = out.index.hour == p.anchor_hour_utc
+    day_key = out.index.floor("D")
+    # bars_since_anchor_start: position within the OR window for anchor-hour bars, else NaN
+    anchor_start_idx = out.index.to_series().where(is_anchor_hour).groupby(day_key).transform("first")
+    minutes_since_anchor = (out.index.to_series() - anchor_start_idx).dt.total_seconds() / 60.0
+    bar_minutes = (out.index.to_series().diff().dt.total_seconds() / 60.0).median()
+    in_or_window = (minutes_since_anchor >= 0) & (minutes_since_anchor < p.or_window_bars * bar_minutes)
 
-    if p.trigger == "rsi":
-        long_signal = long_ok & (out["rsi"].shift(1) < oversold_level) & (out["rsi"] >= oversold_level)
-        short_signal = short_ok & (out["rsi"].shift(1) > overbought_level) & (out["rsi"] <= overbought_level)
-    elif p.trigger == "pullback":
-        # The documented trigger: the FIRST counter-color candle while the
-        # filter holds -- a red candle in an uptrend, green in a downtrend.
-        # "First" means the previous bar was not itself counter-color, so a
-        # run of red candles fires once, not repeatedly.
-        red = out["close"] < out["open"]
-        green = out["close"] > out["open"]
-        long_signal = long_ok & red & ~red.shift(1).fillna(False)
-        short_signal = short_ok & green & ~green.shift(1).fillna(False)
-    elif p.trigger == "none":
-        # Pure VWAP side + slope, entering on the bar the filter first turns
-        # true (not every bar it stays true, which would just re-enter).
-        long_signal = long_ok & ~long_ok.shift(1).fillna(False)
-        short_signal = short_ok & ~short_ok.shift(1).fillna(False)
-    else:
-        raise ValueError(f"unknown trigger {p.trigger!r}")
-    if p.min_vwap_dist_atr > 0:
-        stretched = (out["close"] - out["vwap"]).abs() >= p.min_vwap_dist_atr * out["atr"]
-        long_signal &= stretched.fillna(False)
-        short_signal &= stretched.fillna(False)
+    or_high = out["high"].where(in_or_window).groupby(day_key).cummax()
+    or_low = out["low"].where(in_or_window).groupby(day_key).cummin()
+    # Freeze at the last value observed during the window, forward-filled for the rest of the day.
+    or_high_frozen = or_high.groupby(day_key).ffill()
+    or_low_frozen = or_low.groupby(day_key).ffill()
+    out["or_high"] = or_high_frozen
+    out["or_low"] = or_low_frozen
+    out["or_window_closed"] = ~in_or_window & out["or_high"].notna()
+
+    long_trigger = out["or_high"] + p.k_buffer_atr * out["atr"]
+    short_trigger = out["or_low"] - p.k_buffer_atr * out["atr"]
+    out["long_trigger"] = long_trigger
+    out["short_trigger"] = short_trigger
+
+    active_hours = (out.index.hour >= p.anchor_hour_utc) & (out.index.hour < p.cutoff_hour_utc)
+    out["active"] = active_hours & out["or_window_closed"]
+
+    # Abnormal opening-volume filter (research docs' Recommendation #5, the
+    # single strongest documented ORB enhancement): today's OR-window volume
+    # vs. the trailing average of PRIOR days' OR-window volume only (shift(1)
+    # -- today never contributes to its own baseline, no look-ahead).
+    daily_or_vol = out["volume"].where(in_or_window, 0.0).groupby(day_key).sum()
+    trailing_avg_vol = daily_or_vol.rolling(p.volume_lookback_days, min_periods=3).mean().shift(1)
+    out["or_volume_today"] = day_key.map(daily_or_vol)
+    out["or_volume_trailing_avg"] = day_key.map(trailing_avg_vol)
+    volume_ok = out["or_volume_today"] >= p.volume_mult * out["or_volume_trailing_avg"]
+
+    long_signal = out["active"] & (out["close"] > long_trigger)
+    short_signal = out["active"] & (out["close"] < short_trigger)
+    if p.use_volume_filter:
+        long_signal &= volume_ok.fillna(False)
+        short_signal &= volume_ok.fillna(False)
+    if p.min_or_range_atr > 0:
+        or_wide_enough = (out["or_high"] - out["or_low"]) >= p.min_or_range_atr * out["atr"]
+        long_signal &= or_wide_enough.fillna(False)
+        short_signal &= or_wide_enough.fillna(False)
+    if p.use_pivot_filter:
+        long_signal &= out["close"] > out["P"]
+        short_signal &= out["close"] < out["P"]
 
     out["long_signal"] = long_signal.fillna(False)
     out["short_signal"] = short_signal.fillna(False)
     return out
 
 
-def run_backtest(df: pd.DataFrame, params: VWAPRSIParams, symbol: str, starting_equity: float = 10_000.0,
+def run_backtest(df: pd.DataFrame, params: ORBPivotParams, symbol: str, starting_equity: float = 10_000.0,
                  friction: FrictionModel | None = None) -> dict:
     """`friction` may be injected to override the default cost model -- e.g. a
     `FrictionModel(frictionless=True)` to measure the signal's ceiling."""
@@ -124,8 +123,10 @@ def run_backtest(df: pd.DataFrame, params: VWAPRSIParams, symbol: str, starting_
         friction = FrictionModel(symbol=symbol)
 
     equity = starting_equity
-    position = None  # dict with side, entry_price, stop, target, size, entry_ts
+    position = None
     trades = []
+    trades_today = 0
+    current_day = None
 
     idx = sig.index
     for i in range(len(idx) - 1):
@@ -133,13 +134,18 @@ def run_backtest(df: pd.DataFrame, params: VWAPRSIParams, symbol: str, starting_
         next_row = sig.iloc[i + 1]
         ts_next = idx[i + 1]
 
+        day = idx[i].floor("D")
+        if day != current_day:
+            current_day = day
+            trades_today = 0
+
         if position is not None:
             hit_stop = (position["side"] == 1 and next_row["low"] <= position["stop"]) or \
                        (position["side"] == -1 and next_row["high"] >= position["stop"])
             hit_target = (position["side"] == 1 and next_row["high"] >= position["target"]) or \
                          (position["side"] == -1 and next_row["low"] <= position["target"])
             if hit_stop or hit_target:
-                # Conservative: assume stop fills first if both are touched in one bar.
+                # Conservative: assume stop fills first if both touched in one bar.
                 level = position["stop"] if hit_stop else position["target"]
                 # Exit crosses the spread against us too (this was missing before).
                 exit_price = level - position["side"] * friction.half_spread(
@@ -160,6 +166,8 @@ def run_backtest(df: pd.DataFrame, params: VWAPRSIParams, symbol: str, starting_
                 position = None
             continue
 
+        if trades_today >= params.max_trades_per_day:
+            continue
         if not np.isfinite(row.get("atr", np.nan)) or row["atr"] <= 0:
             continue
 
@@ -169,10 +177,24 @@ def run_backtest(df: pd.DataFrame, params: VWAPRSIParams, symbol: str, starting_
 
         entry_price = friction.apply_fill(ts_next, next_row["open"], row["atr"], side,
                                           bar_spread=next_row.get("spread"))
-        stop = entry_price - side * params.stop_atr_mult * row["atr"]
-        target = entry_price + side * params.target_atr_mult * row["atr"]
+
+        if params.use_pivot_stop_target and np.isfinite(row.get("S1", np.nan)) and np.isfinite(row.get("R1", np.nan)):
+            if side == 1:
+                candidate = min(row["or_low"], row["S1"])
+                dist = entry_price - candidate
+                stop = candidate if dist >= params.stop_atr_mult * row["atr"] else entry_price - params.stop_atr_mult * row["atr"]
+                target = row["R1"]
+            else:
+                candidate = max(row["or_high"], row["R1"])
+                dist = candidate - entry_price
+                stop = candidate if dist >= params.stop_atr_mult * row["atr"] else entry_price + params.stop_atr_mult * row["atr"]
+                target = row["S1"]
+        else:
+            stop = entry_price - side * params.stop_atr_mult * row["atr"]
+            target = entry_price + side * params.target_atr_mult * row["atr"]
+
         risk_per_unit = abs(entry_price - stop)
-        if risk_per_unit <= 0:
+        if risk_per_unit <= 0 or not np.isfinite(target):
             continue
         size = (params.risk_pct * equity) / risk_per_unit
 
@@ -181,6 +203,7 @@ def run_backtest(df: pd.DataFrame, params: VWAPRSIParams, symbol: str, starting_
             "size": size, "entry_ts": ts_next, "equity_at_entry": equity,
             "risk_amount": params.risk_pct * equity,
         }
+        trades_today += 1
 
     trades_df = pd.DataFrame(trades)
     return {"trades": trades_df, "final_equity": equity, "params": params.__dict__}
